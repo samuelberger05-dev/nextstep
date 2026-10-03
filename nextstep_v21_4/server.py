@@ -1734,6 +1734,6 @@ class Handler(BaseHTTPRequestHandler):
 
 if __name__ == '__main__':
     init_db()
-    port=int(os.getenv('NEXTSTEP_PORT','8000'))
-    print(f'NextStep läuft auf http://127.0.0.1:{port}')
-    ThreadingHTTPServer(('127.0.0.1',port), Handler).serve_forever()
+    port=int(os.getenv('PORT', os.getenv('NEXTSTEP_PORT','8000')))
+    print(f'NextStep läuft auf http://0.0.0.0:{port}')
+    ThreadingHTTPServer(('0.0.0.0',port), Handler).serve_forever()
