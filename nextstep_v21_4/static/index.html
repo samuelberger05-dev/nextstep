@@ -142,7 +142,7 @@ async function openLearning(){
 $('learnBtn').onclick=openLearning;$('tutorBtn').onclick=()=>{$('tutorArea').classList.remove('hidden');$('learningArea').classList.add('hidden');$('curriculumArea').classList.add('hidden');$('tutorInput').focus()};
 async function loadMe(){try{const r=await fetch('/api/me');const d=await r.json();if(d.user){data=d.user;await dashboard()}}catch(e){console.error(e)}}
 document.querySelectorAll('[data-role]').forEach(b=>b.onclick=()=>{role=b.dataset.role;document.querySelectorAll('[data-role]').forEach(x=>x.classList.toggle('sel',x===b))});
-$('accountNext').onclick=()=>{let e=$('email').value.trim(),p=$('password').value;if(!e.includes('@'))return $('email').focus();if(p.length<8)return $('password').focus();data.email=e;data.password=p;show('profileForm');bar(2)};
+$('accountNext').onclick=()=>{try{let e=$('email').value.trim(),p=$('password').value;if(!e.includes('@')){setMessage('loginMsg','Bitte gib eine gültige E-Mail-Adresse ein.','error');$('email').focus();return}if(p.length<8){setMessage('loginMsg','Das Passwort muss mindestens 8 Zeichen haben.','error');$('password').focus();return}data.email=e;data.password=p;show('profileForm');bar(2)}catch(err){console.error('NextStep Registrierung Schritt 1:',err);alert('Der nächste Schritt konnte nicht geöffnet werden. Bitte Seite neu laden.')}};
 $('backAccount').onclick=()=>{show('account');bar(1)};
 $('profileNext').onclick=()=>{if(!$('name').value.trim())return $('name').focus();data.name=$('name').value.trim();data.role=role;data.country=$('country').value;data.age=$('age').value;data.about=$('about').value.trim();show('goalForm');bar(3)};
 $('backProfile').onclick=()=>{show('profileForm');bar(2)};
