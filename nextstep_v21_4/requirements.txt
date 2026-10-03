@@ -1,0 +1,2 @@
+# NextStep v0.3 uses only Python standard-library modules.
+# No external packages are required.
