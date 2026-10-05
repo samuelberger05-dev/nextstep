@@ -9,6 +9,10 @@ BASE = os.path.dirname(os.path.abspath(__file__))
 DATABASE_URL = os.getenv("DATABASE_URL", "").strip()
 DB = os.getenv("NEXTSTEP_DB_PATH", os.path.join(BASE, 'nextstep.db')).strip()
 STATIC = os.path.join(BASE, 'static')
+# Optional real AI tutor. Without an API key, NextStep keeps its local fallback tutor.
+LLM_API_KEY = os.getenv("OPENAI_API_KEY", "").strip()
+LLM_MODEL = os.getenv("OPENAI_MODEL", "gpt-6-luna").strip()
+LLM_URL = os.getenv("OPENAI_RESPONSES_URL", "https://api.openai.com/v1/responses").strip()
 SESSIONS = {}
 
 try:
