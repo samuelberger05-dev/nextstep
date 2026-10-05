@@ -1145,7 +1145,19 @@ class Handler(BaseHTTPRequestHandler):
             next_level_xp = level * 100
             current_level_xp = (level - 1) * 100
             progress = round((xp - current_level_xp) / 100 * 100)
-            self.send_json(200, {'user': public_user(row), 'rank': rank, 'total_users': total, 'level': level, 'next_level_xp': next_level_xp, 'progress': progress}); return
+            self.send_json(200, {'user': public_user(row), 'xp': xp, 'rank': rank, 'total_users': total, 'level': level, 'next_level_xp': next_level_xp, 'progress': progress}); return
+        if path == '/api/leaderboard':
+            row=session_user(self)
+            if not row: return self.send_json(401, {'error':'Nicht eingeloggt.'})
+            conn=db()
+            users=conn.execute('SELECT id,name,xp,created_at FROM users ORDER BY xp DESC, id ASC LIMIT 100').fetchall()
+            total=conn.execute('SELECT COUNT(*) FROM users').fetchone()[0]
+            conn.close()
+            leaderboard=[]
+            for idx,u in enumerate(users,1):
+                leaderboard.append({'rank':idx,'id':u['id'],'name':u['name'],'xp':u['xp'],'is_current_user':u['id']==row['id']})
+            self.send_json(200, {'leaderboard':leaderboard,'total_users':total})
+            return
         if path == '/api/community':
             row=session_user(self)
             if not row: return self.send_json(401, {'error':'Nicht eingeloggt.'})
