@@ -497,8 +497,7 @@ def init_db():
         ('Physik für Anfänger','1 · Grundlagen','Kraft und Bewegung', 'Erkläre mit eigenen Worten, was eine Kraft bewirken kann.', 'text', 'bewegung', 20, 301),
         ('Physik für Anfänger','1 · Grundlagen','Geschwindigkeit', 'Ein Auto fährt 100 km in 2 Stunden. Wie hoch ist die Durchschnittsgeschwindigkeit?', 'math', '50', 25, 302),
         ('Physik für Anfänger','2 · Energie','Energieformen', 'Nenne drei verschiedene Energieformen.', 'text', '3', 25, 303),
-        ('Physik für Anfänger','2 · Elektrizität','Stromkreis', 'Welche drei grundlegenden Bestandteile braucht ein einfacher Stromkreis?', 'text', 'quelle', 30, 304),
-        ('Physik für Anfänger','3 · Praxis','Anwendung', 'Erkläre ein physikalisches Phänomen aus deinem Alltag.', 'text', 'erklärung', 40, 305),
+        ('Physik für Anfänger','2 · Elektrizität','Stromkreis', 'Welche drei grundlegenden Bestandteile braucht ein einfacher Stromkreis?', 'text', 'quelle', 30, 304),        ('Physik für Anfänger','3 · Praxis','Anwendung', 'Erkläre ein physikalisches Phänomen aus deinem Alltag.', 'text', 'erklärung', 40, 305),
         # Chemie
         ('Chemie für Anfänger','1 · Grundlagen','Atome', 'Erkläre mit eigenen Worten, was ein Atom ist.', 'text', 'klein', 20, 401),
         ('Chemie für Anfänger','1 · Grundlagen','Elemente', 'Was ist ein chemisches Element?', 'text', 'atomsorte', 20, 402),
@@ -997,8 +996,7 @@ def _generated_task_for(conn, user_id, comp, plan):
     llm_task=create_llm_task(conn,user_id,comp,plan)
     if llm_task:
         return llm_task
-    path=plan['subject'] + (' – Fortgeschritten' if is_advanced_target(plan['target_level']) else ' für Anfänger')
-    topic=(comp['topic'] or comp['title']).lower(); mastery=int(comp['mastery']); variant='Grundlagen' if mastery < 35 else ('Transfer' if mastery < 65 else 'Challenge')
+    path=plan['subject'] + (' – Fortgeschritten' if is_advanced_target(plan['target_level']) else ' für Anfänger')    topic=(comp['topic'] or comp['title']).lower(); mastery=int(comp['mastery']); variant='Grundlagen' if mastery < 35 else ('Transfer' if mastery < 65 else 'Challenge')
     title=f"KI-Aufgabe · {comp['title']} · {variant}"; content=''; answer=''; task_type='text'; xp=25
     subject=plan['subject']
     if subject == 'Python':
@@ -1497,8 +1495,7 @@ class Handler(BaseHTTPRequestHandler):
             conn.close()
             from datetime import date, timedelta
             today=date.today()
-            by_day={x['day']:dict(x) for x in attempts}
-            by_xp={x['day']:x['xp'] for x in xp_days}
+            by_day={x['day']:dict(x) for x in attempts}            by_xp={x['day']:x['xp'] for x in xp_days}
             daily=[]
             for i in range(29,-1,-1):
                 d=(today-timedelta(days=i)).isoformat(); a=by_day.get(d,{})
@@ -1579,6 +1576,28 @@ class Handler(BaseHTTPRequestHandler):
             rec=adaptive_recommendation(conn,row['id'],plan); conn.close()
             self.send_json(200, rec or {'status':'none','task':None,'message':'Noch keine Empfehlung verfügbar.'})
             return
+
+        if path == '/api/goalpredictor/live':
+            try:
+                from goalpredictor_api import live_matches
+                return self.send_json(200, live_matches())
+            except Exception as exc:
+                return self.send_json(500, {'configured': False, 'matches': [], 'error': str(exc)})
+
+        if path == '/api/goalpredictor/today':
+            try:
+                from goalpredictor_api import today_matches
+                return self.send_json(200, today_matches())
+            except Exception as exc:
+                return self.send_json(500, {'configured': False, 'matches': [], 'error': str(exc)})
+
+        if path.startswith('/api/goalpredictor/match/'):
+            try:
+                from goalpredictor_api import match_detail
+                fixture_id=int(path.rsplit('/',1)[1])
+                return self.send_json(200, match_detail(fixture_id))
+            except Exception as exc:
+                return self.send_json(500, {'configured': False, 'error': str(exc)})
 
         if path == '/': path = '/index.html'
         safe = os.path.normpath(path.lstrip('/'))
@@ -1997,8 +2016,7 @@ class Handler(BaseHTTPRequestHandler):
 
         self.send_json(404, {'error':'Nicht gefunden.'})
 
-    def log_message(self, fmt, *args):
-        print('%s - %s' % (self.address_string(), fmt%args))
+    def log_message(self, fmt, *args):        print('%s - %s' % (self.address_string(), fmt%args))
 
 
 if __name__ == '__main__':
