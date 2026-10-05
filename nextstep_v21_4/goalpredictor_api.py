@@ -81,8 +81,11 @@ def today_matches():
         return {"configured": False, "matches": [], "error": "APIFOOTBALL_KEY fehlt in Render."}
     today = datetime.now(ZoneInfo("Europe/Vienna")).date().isoformat()
     ids = "-".join(str(x) for x in LEAGUES)
-    data = _get("/fixtures", {"date": today, "league": ids, "timezone": "Europe/Vienna"})
-    matches = [_fixture_item(x) for x in data.get("response", [])]
+    data = _get("/fixtures", {"date": today, "timezone": "Europe/Vienna"})
+    matches = [
+        _fixture_item(x) for x in data.get("response", [])
+        if (x.get("league") or {}).get("id") in LEAGUES
+    ]
     matches.sort(key=lambda x: (x.get("date") or "", x.get("league") or ""))
     return {"configured": True, "matches": matches, "date": today, "leagues": LEAGUES, "errors": data.get("errors", [])}
 
