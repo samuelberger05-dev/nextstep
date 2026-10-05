@@ -118,16 +118,33 @@ class PostgresCursor:
             translated = translated.rstrip().rstrip(';') + ' RETURNING id'
 
         try:
+            is_alter = translated.lstrip().upper().startswith('ALTER TABLE ')
+            if is_alter:
+                self._cursor.connection.execute('SAVEPOINT nextstep_alter')
             if params is None:
                 self._cursor.execute(translated)
             else:
                 self._cursor.execute(translated, params)
+            if is_alter:
+                self._cursor.connection.execute('RELEASE SAVEPOINT nextstep_alter')
         except Exception as exc:
-            if pg_errors is not None:
-                if isinstance(exc, pg_errors.UniqueViolation):
-                    raise sqlite3.IntegrityError(str(exc)) from exc
-                if isinstance(exc, pg_errors.DuplicateColumn):
-                    raise sqlite3.OperationalError(str(exc)) from exc
+            if pg_errors is not None and isinstance(exc, pg_errors.DuplicateColumn):
+                # SQLite used to ignore "column already exists". In PostgreSQL the
+                # failed statement aborts the transaction, so recover to a savepoint.
+                try:
+                    self._cursor.connection.execute('ROLLBACK TO SAVEPOINT nextstep_alter')
+                    self._cursor.connection.execute('RELEASE SAVEPOINT nextstep_alter')
+                except Exception:
+                    pass
+                raise sqlite3.OperationalError(str(exc)) from exc
+            if pg_errors is not None and isinstance(exc, pg_errors.UniqueViolation):
+                raise sqlite3.IntegrityError(str(exc)) from exc
+            if is_alter:
+                try:
+                    self._cursor.connection.execute('ROLLBACK TO SAVEPOINT nextstep_alter')
+                    self._cursor.connection.execute('RELEASE SAVEPOINT nextstep_alter')
+                except Exception:
+                    pass
             raise
 
         if wants_id:
@@ -1274,12 +1291,24 @@ class Handler(BaseHTTPRequestHandler):
             if not row: return self.send_json(401, {'error':'Nicht eingeloggt.'})
             conn=db(); conn.execute('DELETE FROM reddit_connections WHERE user_id=?',(row['id'],)); conn.commit(); conn.close(); return self.send_json(200, {'connected':False,'message':'Reddit-Verbindung entfernt.'})
         if path == '/api/health':
-            self.send_json(200, {
-                'ok': True,
-                'database': 'postgresql' if DATABASE_URL else 'sqlite',
-                'persistent': bool(DATABASE_URL),
-                'message': 'NextStep-Datenbank ist verbunden.'
-            })
+            try:
+                conn=db()
+                conn.execute('SELECT 1').fetchone()
+                conn.close()
+                self.send_json(200, {
+                    'ok': True,
+                    'database': 'postgresql' if DATABASE_URL else 'sqlite',
+                    'persistent': bool(DATABASE_URL),
+                    'message': 'NextStep-Datenbank ist verbunden.'
+                })
+            except Exception as exc:
+                print('DATABASE HEALTH ERROR:', exc)
+                self.send_json(503, {
+                    'ok': False,
+                    'database': 'postgresql' if DATABASE_URL else 'sqlite',
+                    'persistent': bool(DATABASE_URL),
+                    'message': 'NextStep-Datenbank ist nicht erreichbar.'
+                })
             return
 
         if path == '/api/me':
