@@ -4,31 +4,184 @@ from urllib.parse import urlparse, parse_qs, urlencode, quote
 import json
 
 BASE = os.path.dirname(os.path.abspath(__file__))
-# Production: set NEXTSTEP_DB_PATH to a persistent location (e.g. /var/data/nextstep.db on Render).
-# Local development keeps using nextstep.db beside the server.
+# Production database: Render/Postgres supplies DATABASE_URL.
+# Local development keeps using SQLite when DATABASE_URL is not configured.
+DATABASE_URL = os.getenv("DATABASE_URL", "").strip()
 DB = os.getenv("NEXTSTEP_DB_PATH", os.path.join(BASE, 'nextstep.db')).strip()
-_db_dir = os.path.dirname(os.path.abspath(DB))
-os.makedirs(_db_dir, exist_ok=True)
 STATIC = os.path.join(BASE, 'static')
 SESSIONS = {}
 
-# Optional real LLM integration. The app remains usable without an API key.
-LLM_API_KEY = os.getenv("NEXTSTEP_OPENAI_API_KEY", "").strip()
-LLM_MODEL = os.getenv("NEXTSTEP_OPENAI_MODEL", "gpt-6-luna").strip()
-LLM_URL = os.getenv("NEXTSTEP_OPENAI_URL", "https://api.openai.com/v1/responses").strip()
+try:
+    import psycopg
+    from psycopg import errors as pg_errors
+except ImportError:
+    psycopg = None
+    pg_errors = None
 
-GITHUB_CLIENT_ID = os.getenv("NEXTSTEP_GITHUB_CLIENT_ID", "").strip()
-GITHUB_CLIENT_SECRET = os.getenv("NEXTSTEP_GITHUB_CLIENT_SECRET", "").strip()
-GITHUB_REDIRECT_URI = os.getenv("NEXTSTEP_GITHUB_REDIRECT_URI", "http://localhost:8000/api/integrations/github/callback").strip()
-GITHUB_API_VERSION = "2026-03-10"
 
-REDDIT_CLIENT_ID = os.getenv("NEXTSTEP_REDDIT_CLIENT_ID", "").strip()
-REDDIT_CLIENT_SECRET = os.getenv("NEXTSTEP_REDDIT_CLIENT_SECRET", "").strip()
-REDDIT_REDIRECT_URI = os.getenv("NEXTSTEP_REDDIT_REDIRECT_URI", "http://localhost:8000/api/integrations/reddit/callback").strip()
-REDDIT_USER_AGENT = os.getenv("NEXTSTEP_REDDIT_USER_AGENT", "NextStep/0.1 by NextStepApp").strip()
+class HybridRow(dict):
+    """A small compatibility row: supports both row['name'] and row[0]."""
+    def __init__(self, columns, values):
+        super().__init__(zip(columns, values))
+        self._values = tuple(values)
+
+    def __getitem__(self, key):
+        if isinstance(key, int):
+            return self._values[key]
+        return super().__getitem__(key)
+
+
+def _replace_qmark_placeholders(sql):
+    """Convert SQLite ? placeholders to psycopg %s without touching quoted strings."""
+    out = []
+    in_single = False
+    in_double = False
+    i = 0
+    while i < len(sql):
+        ch = sql[i]
+        if ch == "'" and not in_double:
+            if in_single and i + 1 < len(sql) and sql[i + 1] == "'":
+                out.extend(["'", "'"])
+                i += 2
+                continue
+            in_single = not in_single
+            out.append(ch)
+        elif ch == '"' and not in_single:
+            if in_double and i + 1 < len(sql) and sql[i + 1] == '"':
+                out.extend(['"', '"'])
+                i += 2
+                continue
+            in_double = not in_double
+            out.append(ch)
+        elif ch == '?' and not in_single and not in_double:
+            out.append('%s')
+        else:
+            out.append(ch)
+        i += 1
+    return ''.join(out)
+
+
+_SERIAL_ID_TABLES = {
+    'users', 'learning_tasks', 'tutor_messages', 'xp_events',
+    'error_profiles', 'learning_competencies', 'curricula', 'competencies',
+    'community_posts', 'community_comments', 'task_attempts'
+}
+
+
+def _translate_postgres_sql(sql):
+    sql = _replace_qmark_placeholders(sql)
+    # SQLite's autoincrement declaration -> PostgreSQL sequence-backed integer.
+    sql = re.sub(r'\bINTEGER\s+PRIMARY\s+KEY\s+AUTOINCREMENT\b',
+                 'SERIAL PRIMARY KEY', sql, flags=re.I)
+    # SQLite date('now') idiom -> PostgreSQL standard current date.
+    sql = re.sub(r"\bdate\(\s*'now'\s*\)", 'CURRENT_DATE', sql, flags=re.I)
+    sql = re.sub(r"\bdate\(\s*created_at\s*\)", "created_at::date", sql, flags=re.I)
+
+    upper = sql.lstrip().upper()
+    if upper.startswith('INSERT OR IGNORE '):
+        sql = re.sub(r'^\s*INSERT\s+OR\s+IGNORE\s+', 'INSERT ', sql, flags=re.I)
+        if ' ON CONFLICT ' not in sql.upper():
+            sql = sql.rstrip().rstrip(';') + ' ON CONFLICT DO NOTHING'
+    elif upper.startswith('INSERT OR REPLACE '):
+        # The only current OR REPLACE usage is the session upsert.
+        sql = re.sub(r'^\s*INSERT\s+OR\s+REPLACE\s+INTO\s+sessions\s*\(\s*token\s*,\s*user_id\s*\)',
+                     'INSERT INTO sessions(token,user_id)', sql, flags=re.I)
+        sql = sql.rstrip().rstrip(';') + ' ON CONFLICT (token) DO UPDATE SET user_id=EXCLUDED.user_id'
+
+    return sql
+
+
+class PostgresCursor:
+    def __init__(self, cursor):
+        self._cursor = cursor
+        self._lastrowid = None
+
+    @property
+    def lastrowid(self):
+        return self._lastrowid
+
+    def _wrap(self, raw):
+        if raw is None:
+            return None
+        columns = [d.name for d in self._cursor.description]
+        return HybridRow(columns, raw)
+
+    def execute(self, sql, params=None):
+        translated = _translate_postgres_sql(sql)
+        self._lastrowid = None
+
+        # Preserve the sqlite cursor.lastrowid behaviour used throughout NextStep.
+        table_match = re.match(r'^\s*INSERT(?:\s+OR\s+(?:IGNORE|REPLACE))?\s+INTO\s+([A-Za-z_][A-Za-z0-9_]*)',
+                               translated, flags=re.I)
+        wants_id = bool(table_match and table_match.group(1).lower() in _SERIAL_ID_TABLES)
+        if wants_id and ' RETURNING ' not in translated.upper():
+            translated = translated.rstrip().rstrip(';') + ' RETURNING id'
+
+        try:
+            if params is None:
+                self._cursor.execute(translated)
+            else:
+                self._cursor.execute(translated, params)
+        except Exception as exc:
+            if pg_errors is not None:
+                if isinstance(exc, pg_errors.UniqueViolation):
+                    raise sqlite3.IntegrityError(str(exc)) from exc
+                if isinstance(exc, pg_errors.DuplicateColumn):
+                    raise sqlite3.OperationalError(str(exc)) from exc
+            raise
+
+        if wants_id:
+            raw = self._cursor.fetchone()
+            self._lastrowid = raw[0] if raw else None
+        return self
+
+    def executemany(self, sql, seq_of_params):
+        translated = _translate_postgres_sql(sql)
+        try:
+            self._cursor.executemany(translated, seq_of_params)
+        except Exception as exc:
+            if pg_errors is not None and isinstance(exc, pg_errors.UniqueViolation):
+                raise sqlite3.IntegrityError(str(exc)) from exc
+            raise
+        self._lastrowid = None
+        return self
+
+    def fetchone(self):
+        return self._wrap(self._cursor.fetchone())
+
+    def fetchall(self):
+        return [self._wrap(row) for row in self._cursor.fetchall()]
+
+    def __iter__(self):
+        for row in self._cursor:
+            yield self._wrap(row)
+
+
+class PostgresConnection:
+    def __init__(self, connection):
+        self._connection = connection
+
+    def execute(self, sql, params=None):
+        return PostgresCursor(self._connection.cursor()).execute(sql, params)
+
+    def executemany(self, sql, seq_of_params):
+        return PostgresCursor(self._connection.cursor()).executemany(sql, seq_of_params)
+
+    def commit(self):
+        self._connection.commit()
+
+    def rollback(self):
+        self._connection.rollback()
+
+    def close(self):
+        self._connection.close()
 
 
 def db():
+    if DATABASE_URL:
+        if psycopg is None:
+            raise RuntimeError('PostgreSQL ist konfiguriert, aber psycopg fehlt. requirements.txt muss psycopg[binary] enthalten.')
+        return PostgresConnection(psycopg.connect(DATABASE_URL))
     conn = sqlite3.connect(DB)
     conn.row_factory = sqlite3.Row
     return conn
@@ -36,12 +189,6 @@ def db():
 
 def init_db():
     conn = db()
-    conn.execute('''CREATE TABLE IF NOT EXISTS sessions (
-        token TEXT PRIMARY KEY,
-        user_id INTEGER NOT NULL,
-        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY(user_id) REFERENCES users(id)
-    )''')
     conn.execute('''CREATE TABLE IF NOT EXISTS users (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         email TEXT UNIQUE NOT NULL,
@@ -58,6 +205,12 @@ def init_db():
         skills TEXT NOT NULL DEFAULT '',
         xp INTEGER NOT NULL DEFAULT 0,
         created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )''')
+    conn.execute('''CREATE TABLE IF NOT EXISTS sessions (
+        token TEXT PRIMARY KEY,
+        user_id INTEGER NOT NULL,
+        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY(user_id) REFERENCES users(id)
     )''')
     conn.execute('''CREATE TABLE IF NOT EXISTS learning_tasks (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -1120,6 +1273,15 @@ class Handler(BaseHTTPRequestHandler):
             row=session_user(self)
             if not row: return self.send_json(401, {'error':'Nicht eingeloggt.'})
             conn=db(); conn.execute('DELETE FROM reddit_connections WHERE user_id=?',(row['id'],)); conn.commit(); conn.close(); return self.send_json(200, {'connected':False,'message':'Reddit-Verbindung entfernt.'})
+        if path == '/api/health':
+            self.send_json(200, {
+                'ok': True,
+                'database': 'postgresql' if DATABASE_URL else 'sqlite',
+                'persistent': bool(DATABASE_URL),
+                'message': 'NextStep-Datenbank ist verbunden.'
+            })
+            return
+
         if path == '/api/me':
             self.send_json(200, {'user': public_user(session_user(self))}); return
         if path == '/api/integrations/github/sync':
