@@ -1428,14 +1428,17 @@ class Handler(BaseHTTPRequestHandler):
                 row = conn.execute('SELECT * FROM users WHERE id=?',(uid,)).fetchone()
             except sqlite3.IntegrityError:
                 conn.close(); return self.send_json(409, {'error':'Für diese E-Mail-Adresse existiert bereits ein Konto.'})
+            token = secrets.token_urlsafe(32)
+            conn.execute('INSERT OR REPLACE INTO sessions(token,user_id) VALUES(?,?)',(token,uid))
+            conn.commit()
             conn.close()
-            token = secrets.token_urlsafe(32); SESSIONS[token] = uid
-            self.send_json(201, {'user':public_user(row)}, [f'session={token}; HttpOnly; SameSite=Lax; Path=/'])
+            SESSIONS[token] = uid
+            self.send_json(201, {'user':public_user(row)}, [f'session={token}; Max-Age=2592000; HttpOnly; SameSite=Lax; Path=/'])
             return
 
         if path == '/api/login':
             email = clean(body.get('email'),254).lower(); password = str(body.get('password') or '')
-            conn=db(); row=conn.execute('SELECT * FROM users WHERE email=?',(email,)).fetchone(); conn.close()
+            conn=db(); row=conn.execute('SELECT * FROM users WHERE email=?',(email,)).fetchone()
             if not row:
                 conn.close()
                 return self.send_json(401, {'error':'Für diese E-Mail-Adresse wurde kein Konto gefunden.'})
