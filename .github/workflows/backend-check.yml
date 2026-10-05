@@ -1,0 +1,26 @@
+name: NextStep backend check
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "nextstep_v21_4/server.py"
+      - "nextstep_v21_4/requirements.txt"
+      - ".github/workflows/backend-check.yml"
+  pull_request:
+    paths:
+      - "nextstep_v21_4/server.py"
+      - "nextstep_v21_4/requirements.txt"
+
+jobs:
+  python-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Install dependencies
+        run: pip install -r nextstep_v21_4/requirements.txt
+      - name: Compile backend
+        run: python -m py_compile nextstep_v21_4/server.py
