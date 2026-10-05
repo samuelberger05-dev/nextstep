@@ -284,11 +284,15 @@ function gpRenderMatches(){
   if(!gpState.matches.length){el.innerHTML='<div class="gp-loading">Keine Spiele gefunden.</div>';return}
   el.innerHTML=gpState.matches.map(m=>{
     const live=['1H','2H','ET','P','LIVE'].includes(m.status);
+    const oddsLabel=m.odds&&m.odds.available?(' · '+m.odds.market_count+' Quotenmärkte'):' · keine Live-Quoten';
+    const odds1x2=m.odds&&m.odds.one_x_two?m.odds.one_x_two:{};
+    const oddsLine=Object.keys(odds1x2).length?('<div class="gp-meta">1X2-Quoten: '+['home','draw','away'].filter(k=>odds1x2[k]).map(k=>({home:'1',draw:'X',away:'2'}[k])+' '+gpEscape(odds1x2[k])).join(' · ')+'</div>'):'';
     return '<div class="gp-match" onclick="gpSelect('+Number(m.fixture_id)+')">'+
-      '<div class="gp-league">'+gpEscape(m.league)+(live?' · <span class="gp-live">LIVE</span>':'')+'</div>'+
+      '<div class="gp-league">#'+(m.selection_rank||'–')+' · '+gpEscape(m.league)+(live?' · <span class="gp-live">LIVE</span>':'')+'</div>'+
       '<div class="gp-match-top"><div class="gp-teams">'+gpEscape(m.home.name)+'<br>'+gpEscape(m.away.name)+'</div>'+
       '<div class="gp-score">'+(m.home_goals??'–')+' : '+(m.away_goals??'–')+'</div></div>'+
-      '<div class="gp-meta">'+(m.minute?m.minute+"′ · ":"")+(m.status_long||m.status||'')+'</div></div>'
+      '<div class="gp-meta">'+(m.minute?m.minute+"′ · ":"")+(m.status_long||m.status||'')+gpEscape(oddsLabel)+'</div>'+oddsLine+
+      '<div class="gp-meta">'+gpEscape(m.selection_reason||'Automatische Vorauswahl')+'</div></div>'
   }).join('');
 }
 async function gpLoad(mode=gpState.mode){
@@ -298,7 +302,9 @@ async function gpLoad(mode=gpState.mode){
     const d=await r.json();
     if(!r.ok)throw new Error(d.error||'GoalPredictor konnte nicht geladen werden.');
     if(!d.configured){gpSetStatus('⚙️ GoalPredictor ist eingebaut. Für echte Live-Daten fehlt noch die Render-Umgebungsvariable APIFOOTBALL_KEY.','info');gpState.matches=[];gpRenderMatches();return}
-    if(d.errors&&d.errors.length)gpSetStatus('⚠️ Datenquelle meldet: '+d.errors.join(', '),'error');else gpSetStatus('✓ Live-Datenquelle verbunden · '+d.matches.length+' Spiele geladen','success');
+    if(d.active===false){gpSetStatus('🌙 '+(d.message||'Live-Betrieb pausiert')+' · Tagesbudget: '+(d.budget?.remaining??'–')+' API-Aufrufe übrig.','info');gpState.matches=[];gpRenderMatches();return}
+    const budgetText=d.budget?(' · API-Budget '+d.budget.used+'/'+d.budget.daily_budget+' (lokales Limit)'):'';
+    if(d.errors&&d.errors.length)gpSetStatus('⚠️ '+d.errors.join(', ')+budgetText,'error');else gpSetStatus('✓ Vorauswahl: '+(d.selected_count??(d.matches||[]).length)+' von '+(d.available_live_count??(d.matches||[]).length)+' Live-Spielen'+budgetText,'success');
     gpState.matches=d.matches||[];gpRenderMatches();
   }catch(e){gpSetStatus('⚠️ '+e.message,'error');$('gpMatches').innerHTML='<div class="gp-loading">Daten konnten nicht geladen werden.</div>'}
 }
@@ -333,7 +339,7 @@ async function gpSelect(id){
 $('goalPredictorNav').onclick=()=>{ $('authArea').classList.add('hidden');$('dashboard').classList.add('hidden');$('goalPredictorArea').classList.remove('hidden');gpLoad('live')};
 $('goalPredictorBack').onclick=()=>location.reload();
 document.querySelectorAll('[data-gp-mode]').forEach(b=>b.onclick=()=>{document.querySelectorAll('[data-gp-mode]').forEach(x=>x.classList.toggle('active',x===b));gpLoad(b.dataset.gpMode)});
-setInterval(()=>{if(!$('goalPredictorArea').classList.contains('hidden'))gpLoad(gpState.mode)},60000);
+setInterval(()=>{if(!$('goalPredictorArea').classList.contains('hidden'))gpLoad(gpState.mode)},600000); // maximal alle 10 Minuten; Server-Cache verhindert doppelte API-Aufrufe
 
 </script>
 </body>
