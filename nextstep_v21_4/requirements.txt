@@ -1,2 +1,3 @@
-# NextStep v0.3 uses only Python standard-library modules.
-# No external packages are required.
+# NextStep Python dependencies
+# PostgreSQL support for production / Render.
+psycopg[binary]>=3.3,<4
