@@ -4,7 +4,11 @@ from urllib.parse import urlparse, parse_qs, urlencode, quote
 import json
 
 BASE = os.path.dirname(os.path.abspath(__file__))
-DB = os.path.join(BASE, 'nextstep.db')
+# Production: set NEXTSTEP_DB_PATH to a persistent location (e.g. /var/data/nextstep.db on Render).
+# Local development keeps using nextstep.db beside the server.
+DB = os.getenv("NEXTSTEP_DB_PATH", os.path.join(BASE, 'nextstep.db')).strip()
+_db_dir = os.path.dirname(os.path.abspath(DB))
+os.makedirs(_db_dir, exist_ok=True)
 STATIC = os.path.join(BASE, 'static')
 SESSIONS = {}
 
@@ -32,6 +36,12 @@ def db():
 
 def init_db():
     conn = db()
+    conn.execute('''CREATE TABLE IF NOT EXISTS sessions (
+        token TEXT PRIMARY KEY,
+        user_id INTEGER NOT NULL,
+        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY(user_id) REFERENCES users(id)
+    )''')
     conn.execute('''CREATE TABLE IF NOT EXISTS users (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         email TEXT UNIQUE NOT NULL,
@@ -424,9 +434,21 @@ def session_user(handler):
     for part in cookie.split(';'):
         if part.strip().startswith('session='):
             token = part.strip().split('=',1)[1]
-    uid = SESSIONS.get(token)
-    if not uid: return None
-    conn = db(); row = conn.execute('SELECT * FROM users WHERE id=?', (uid,)).fetchone(); conn.close()
+    if not token:
+        return None
+    # Keep sessions in the database so a Render restart does not log everyone out.
+    conn = db()
+    session = conn.execute('SELECT user_id FROM sessions WHERE token=?', (token,)).fetchone()
+    if not session:
+        conn.close()
+        # Backward compatibility with an already-running prototype session.
+        uid = SESSIONS.get(token)
+        if not uid:
+            return None
+        row = db().execute('SELECT * FROM users WHERE id=?', (uid,)).fetchone()
+        return row
+    row = conn.execute('SELECT * FROM users WHERE id=?', (session['user_id'],)).fetchone()
+    conn.close()
     return row
 
 
@@ -1414,9 +1436,18 @@ class Handler(BaseHTTPRequestHandler):
         if path == '/api/login':
             email = clean(body.get('email'),254).lower(); password = str(body.get('password') or '')
             conn=db(); row=conn.execute('SELECT * FROM users WHERE email=?',(email,)).fetchone(); conn.close()
-            if not row or not verify_password(password,row['password_hash']): return self.send_json(401, {'error':'E-Mail oder Passwort ist falsch.'})
-            token=secrets.token_urlsafe(32); SESSIONS[token]=row['id']
-            self.send_json(200, {'user':public_user(row)}, [f'session={token}; HttpOnly; SameSite=Lax; Path=/'])
+            if not row:
+                conn.close()
+                return self.send_json(401, {'error':'Für diese E-Mail-Adresse wurde kein Konto gefunden.'})
+            if not verify_password(password,row['password_hash']):
+                conn.close()
+                return self.send_json(401, {'error':'Das Passwort ist falsch. Bitte prüfe deine Eingabe.'})
+            token=secrets.token_urlsafe(32)
+            conn.execute('INSERT OR REPLACE INTO sessions(token,user_id) VALUES(?,?)',(token,row['id']))
+            conn.commit()
+            conn.close()
+            SESSIONS[token]=row['id']
+            self.send_json(200, {'user':public_user(row)}, [f'session={token}; Max-Age=2592000; HttpOnly; SameSite=Lax; Path=/'])
             return
 
         m=re.fullmatch(r'/api/users/(\d+)/(follow|followers)',path)
@@ -1735,7 +1766,9 @@ class Handler(BaseHTTPRequestHandler):
             cookie=self.headers.get('Cookie',''); token=None
             for part in cookie.split(';'):
                 if part.strip().startswith('session='): token=part.strip().split('=',1)[1]
-            if token: SESSIONS.pop(token,None)
+            if token:
+                SESSIONS.pop(token,None)
+                conn=db(); conn.execute('DELETE FROM sessions WHERE token=?',(token,)); conn.commit(); conn.close()
             self.send_json(200, {'ok':True}, ['session=; Max-Age=0; HttpOnly; SameSite=Lax; Path=/']); return
 
         self.send_json(404, {'error':'Nicht gefunden.'})
