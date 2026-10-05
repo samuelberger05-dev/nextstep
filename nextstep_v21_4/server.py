@@ -1880,6 +1880,30 @@ class Handler(BaseHTTPRequestHandler):
                 curriculum_hint=f" Dein aktueller Lernplan ist {cur['title']}. Die nächste Kompetenz ist: {next_comp['title']}."
             else:
                 curriculum_hint=''
+            # Use the real LLM when configured. The local coaching engine below remains
+            # the fallback so the tutor still works without an API key.
+            llm_reply=None
+            if llm_enabled():
+                tutor_payload={
+                    'student': {'name':row['name'],'level':row['level'],'goal':row['goal'] or ''},
+                    'message': message,
+                    'mode': mode,
+                    'topic': topic,
+                    'mastery': mastery,
+                    'curriculum': dict(cur) if cur else None,
+                    'next_competency': dict(next_comp) if comps else None,
+                    'adaptive_task': dict(adaptive['task']) if adaptive and adaptive.get('task') else None,
+                    'recent_messages':[dict(x) for x in recent[-6:]]
+                }
+                llm_reply=llm_text(
+                    "Du bist der persönliche KI-Nachhilfelehrer von NextStep. "
+                    "Hilf einem Lernenden auf seinem aktuellen Niveau. Antworte auf Deutsch, "
+                    "freundlich und konkret. Erkläre verständlich, stelle Rückfragen und gib "
+                    "bei Aufgaben bevorzugt Hinweise statt sofort die vollständige Lösung. "
+                    "Berücksichtige den Lernplan, die aktuelle Kompetenz und die letzte Unterhaltung. "
+                    "Wenn der Lernende eine Aufgabe lösen soll, lass ihn zuerst selbst versuchen.",
+                    tutor_payload, 1200
+                )
             # A deterministic coaching engine for the local prototype. It is intentionally designed
             # around questions and hints, not simply dumping solutions.
             diagnostic_step=profile['diagnostic_step'] if 'diagnostic_step' in profile.keys() else 0
@@ -1934,7 +1958,9 @@ class Handler(BaseHTTPRequestHandler):
                        'Wenn du möchtest, kann ich dich auch mit einer Aufgabe testen. Ich versuche zuerst mit Fragen und Hinweisen zu helfen, statt dir sofort die Lösung zu geben.')
                 if adaptive and adaptive.get('status')=='ready':
                     reply += '\n\n🎯 **Dein nächster Lernschritt:** '+adaptive['task']['title']+'\n'+adaptive['reason']+'\nAktueller Kompetenzstand: '+str(adaptive['mastery'])+' %.'
-            if mode == 'explain':
+            if llm_reply:
+                reply=llm_reply
+            if mode == 'explain' and not llm_reply:
                 reply='Ich erkläre es dir zuerst einfach und danach mit einem Beispiel. '+reply
             elif mode == 'challenge':
                 reply='🎯 Challenge-Modus: '+reply
