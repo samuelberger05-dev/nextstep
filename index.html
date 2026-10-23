@@ -144,12 +144,12 @@ header{height:72px;background:#fff;border-bottom:1px solid var(--line);display:f
 let role='both',data={};const $=id=>document.getElementById(id);
 function showAuth(view='login'){ $('authArea').classList.remove('hidden'); $('dashboard').classList.add('hidden'); $('publicHome').classList.add('hidden'); if(view==='register'){show('account');bar(1);$('loginCard').classList.add('hidden');$('auth').classList.remove('hidden')}else{$('loginCard').classList.remove('hidden');$('auth').classList.add('hidden')} window.scrollTo({top:0,behavior:'smooth'});}
 function showPublicHome(){ $('authArea').classList.add('hidden'); $('dashboard').classList.add('hidden'); $('publicHome').classList.remove('hidden'); $('communityArea').classList.remove('hidden'); $('communityCompose').classList.add('hidden'); $('logout').classList.add('hidden'); $('navUser').textContent=''; }
-function openCommunity(){showPublicHome();loadCommunity('trending');}
+function openCommunity(){showPublicHome();$('communityArea').scrollIntoView({behavior:'smooth'});loadCommunity('trending');}
 
 function bar(n){document.querySelectorAll('.steps span').forEach((x,i)=>x.classList.toggle('on',i<n))}
 function show(id){['account','profileForm','goalForm'].forEach(x=>$(x).classList.toggle('hidden',x!==id))}
 function setMessage(id,text,type){$(id).innerHTML=text?`<div class="message ${type||'info'}">${text}</div>`:''}async function api(path,body){const r=await fetch(path,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body||{})});const d=await r.json();if(!r.ok)throw new Error(d.error||'Fehler');return d}
-async function dashboard(){try{const r=await fetch('/api/dashboard');const d=await r.json();if(!r.ok)throw new Error(d.error||'Dashboard konnte nicht geladen werden.');const u=d.user;data=u;$('authArea').classList.add('hidden');$('dashboard').classList.remove('hidden');$('logout').classList.remove('hidden');$('navUser').textContent=u.name;$('dashLevel').textContent=d.level;$('dashXpText').textContent=d.xp+' XP gesammelt';$('dashProgress').style.width=d.progress+'%';$('dashCurrent').textContent=d.xp+' XP';$('dashNext').textContent=Math.max(0,d.next_level_xp-d.xp)+' XP bis Level '+(d.level+1);$('dashRank').textContent='#'+d.rank;$('rankBig').textContent='#'+d.rank;$('dashTotal').textContent=d.total_users;$('dashXp').textContent=d.xp;$('welcome').textContent='Willkommen, '+u.name+'!';await loadTutorContext(); await loadCurriculum()}catch(e){console.error(e)}}
+async function dashboard(){try{const r=await fetch('/api/dashboard');const d=await r.json();if(!r.ok)throw new Error(d.error||'Dashboard konnte nicht geladen werden.');const u=d.user;data=u;$('authArea').classList.add('hidden');$('publicHome').classList.add('hidden');$('dashboard').classList.remove('hidden');$('logout').classList.remove('hidden');$('navUser').textContent=u.name;$('dashLevel').textContent=d.level;$('dashXpText').textContent=d.xp+' XP gesammelt';$('dashProgress').style.width=d.progress+'%';$('dashCurrent').textContent=d.xp+' XP';$('dashNext').textContent=Math.max(0,d.next_level_xp-d.xp)+' XP bis Level '+(d.level+1);$('dashRank').textContent='#'+d.rank;$('rankBig').textContent='#'+d.rank;$('dashTotal').textContent=d.total_users;$('dashXp').textContent=d.xp;$('welcome').textContent='Willkommen, '+u.name+'!';await loadTutorContext(); await loadCurriculum()}catch(e){console.error(e)}}
 let tutorMode='coach';
 const modeNames={coach:'Coach',explain:'Erklären',challenge:'Herausforderung'};
 function addChat(role,text){const el=document.createElement('div');el.className='msg '+(role==='user'?'user':'ai');el.innerHTML=text.replace(/\n/g,'<br>');$('chat').appendChild(el);$('chat').scrollTop=$('chat').scrollHeight}
@@ -350,7 +350,7 @@ async function gpSelect(id){
   }catch(e){$('gpDetail').innerHTML='<div class="message error">'+gpEscape(e.message)+'</div>'}
 }
 $('goalPredictorNav').onclick=()=>{ $('authArea').classList.add('hidden');$('dashboard').classList.add('hidden');$('goalPredictorArea').classList.remove('hidden');gpLoad('live')};
-loadMe();
+$('publicHome').appendChild($('communityArea'));loadMe();
 $('goalPredictorBack').onclick=()=>location.reload();
 document.querySelectorAll('[data-gp-mode]').forEach(b=>b.onclick=()=>{document.querySelectorAll('[data-gp-mode]').forEach(x=>x.classList.toggle('active',x===b));gpLoad(b.dataset.gpMode)});
 setInterval(()=>{if(!$('goalPredictorArea').classList.contains('hidden'))gpLoad(gpState.mode)},600000); // maximal alle 10 Minuten; Server-Cache verhindert doppelte API-Aufrufe
