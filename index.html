@@ -40,9 +40,9 @@ header{height:72px;background:#fff;border-bottom:1px solid var(--line);display:f
 @media(max-width:800px){.gp-grid{grid-template-columns:1fr}.gp-header{flex-direction:column}.gp-prob-grid{grid-template-columns:1fr 1fr}}
 </style></head>
 <body>
-<header><div class="wrap nav"><div class="brand"><div class="logo">N</div>NextStep</div><div class="navright"><button id="goalPredictorNav" class="gp-nav">⚽ GoalPredictor</button><span id="navUser" class="user-mini"></span><button id="logout" class="hidden">Abmelden</button></div></div></header>
+<header><div class="wrap nav"><div class="brand"><div class="logo">N</div>NextStep</div><div class="navright"><button id="communityNav">Community</button><button id="loginNav">Anmelden</button><button id="registerNav" class="btn primary" style="padding:9px 12px">Registrieren</button><button id="goalPredictorNav" class="gp-nav">⚽ GoalPredictor</button><span id="navUser" class="user-mini"></span><button id="logout" class="hidden">Abmelden</button></div></div></header>
 <div class="wrap">
-<section id="authArea">
+<section id="authArea" class="hidden">
 <section class="hero"><h1>Dein nächster Schritt beginnt hier.</h1><p>Eine Plattform, auf der du lernst, Dinge ausprobierst, Ergebnisse zeigst und gemeinsam mit anderen besser wirst.</p></section>
 <section class="card" id="loginCard"><div id="loginView"><small style="color:#4169e1;font-weight:800">BEREITS REGISTRIERT?</small><h2>Einloggen</h2><p class="sub">Teste deinen bereits angelegten Account.</p><label class="label">E-Mail-Adresse</label><input id="loginEmail" type="email" placeholder="du@beispiel.at"><label class="label">Passwort</label><input id="loginPassword" type="password" placeholder="Dein Passwort"><div class="actions"><span></span><button class="btn primary" id="loginBtn">Einloggen →</button></div><div id="loginMsg"></div></div></section>
 <section class="card" id="auth">
@@ -53,6 +53,10 @@ header{height:72px;background:#fff;border-bottom:1px solid var(--line);display:f
 </select></div><div><label class="label">Altersgruppe</label><select id="age"><option>18–24</option><option>25–34</option><option>35–44</option><option>45–54</option><option>55+</option></select></div></div><div class="row"><div><label class="label">Sprache</label><select id="preferredLanguage"><option value="de">Deutsch</option><option value="en">English</option></select></div><div></div></div><label class="label">Über mich</label><textarea id="about" placeholder="Wer bist du und welche Erfahrungen möchtest du teilen?"></textarea><div class="actions"><button class="btn secondary" id="backAccount">← Zurück</button><button class="btn primary" id="profileNext">Weiter →</button></div></div>
 <div id="goalForm" class="hidden"><small style="color:#4169e1;font-weight:800">SCHRITT 3 VON 3</small><h2>Dein Ziel</h2><p class="sub">Dieses Ziel wird später für Matching und Lernpfade verwendet.</p><label class="label">Was möchtest du erreichen?</label><textarea id="goal" placeholder="z. B. Ich möchte Programmieren lernen und später meine eigene Software entwickeln."></textarea><div class="row"><div><label class="label">Bereich</label><select id="category"><option>Technologie & Programmieren</option><option>Mathematik</option><option>Englisch</option><option>Physik</option><option>Chemie</option><option>Beruf & Karriere</option><option>Business & Selbstständigkeit</option><option>Finanzen & Alltag</option><option>Social Media & Kreativität</option><option>Lernen & Entwicklung</option><option>Sonstiges</option></select></div><div><label class="label">Erfahrungsstand</label><select id="level"><option>Anfänger</option><option>Grundkenntnisse</option><option>Fortgeschritten</option><option>Erfahren</option></select></div></div><label class="label">Fähigkeiten / Erfahrungen</label><input id="skills" placeholder="z. B. Python, Excel, Handwerk, Verkauf"><div class="actions"><button class="btn secondary" id="backProfile">← Zurück</button><button class="btn primary" id="finish">Konto & Profil speichern ✓</button></div></div>
 </section></section>
+
+<section id="publicHome">
+<section class="hero"><h1>Entdecke Wissen. Teile, was du kannst.</h1><p>NextStep bringt neugierige Menschen zusammen. Lies Fragen, entdecke neue Themen und lerne von der Community — ganz ohne Konto. Wenn du selbst aktiv werden möchtest, kannst du dich kostenlos registrieren.</p><div class="actions" style="justify-content:center"><button class="btn primary" onclick="document.getElementById('registerNav').click()">Kostenlos mitmachen</button><button class="btn secondary" onclick="document.getElementById('communityArea').scrollIntoView({behavior:'smooth'})">Beiträge entdecken ↓</button></div></section>
+</section>
 
 <section id="dashboard" class="hidden">
 <section class="hero"><h1 id="dashTitle">Willkommen bei NextStep.</h1><p>Hier beginnt dein persönlicher Weg: lernen, machen, helfen und Schritt für Schritt vorankommen.</p></section>
@@ -76,9 +80,9 @@ header{height:72px;background:#fff;border-bottom:1px solid var(--line);display:f
   <div class="box" style="margin-top:16px"><div style="display:flex;justify-content:space-between;gap:12px;align-items:center"><div><h3 style="margin:0">🔗 Deine Verbindungen</h3><p class="sub" style="margin:5px 0 0">Verbinde externe Plattformen freiwillig, damit NextStep dein Wissensprofil besser einordnen kann.</p></div><span class="badge">Vorschau</span></div><div id="githubIntegration" style="margin-top:14px"></div><div id="redditIntegration" style="margin-top:10px"></div></div>
 </section>
 
-<section class="card hidden" id="communityArea" style="margin-top:20px">
+<section class="card" id="communityArea" style="margin-top:20px">
   <div class="rank-card"><div><small style="color:#4169e1;font-weight:800">SOZIALES LERNEN</small><h2>NextStep Community</h2><p class="sub" style="margin-bottom:0">Stelle Fragen, diskutiere Lerninhalte und hilf anderen. Gute Beiträge bleiben Teil deiner Lern-Community.</p></div><button class="btn secondary" id="communityRefresh">↻ Aktualisieren</button></div>
-  <div class="card" style="padding:18px;margin-top:16px;background:#f9fbff"><h3 style="margin-top:0">✍️ Beitrag erstellen</h3><div class="community-compose"><select id="communityType"><option value="question">❓ Frage</option><option value="discussion">💬 Diskussion</option><option value="tip">💡 Tipp</option></select><input id="communityTitle" placeholder="Worum geht es?"></div><label class="label">Thema</label><select id="communityTopic"><option>Programmieren</option><option>Mathematik</option><option>Englisch</option><option>Physik</option><option>Chemie</option><option>Lernen</option><option>Karriere</option><option>Allgemein</option></select><label class="label">Dein Beitrag</label><textarea id="communityContent" placeholder="Beschreibe deine Frage, Idee oder deinen Tipp möglichst konkret …"></textarea><button class="btn primary" id="communityPostBtn" style="margin-top:12px">Beitrag veröffentlichen</button><div id="communityMsg"></div></div>
+  <div class="card hidden" id="communityCompose" style="padding:18px;margin-top:16px;background:#f9fbff"><h3 style="margin-top:0">✍️ Beitrag erstellen</h3><div class="community-compose"><select id="communityType"><option value="question">❓ Frage</option><option value="discussion">💬 Diskussion</option><option value="tip">💡 Tipp</option></select><input id="communityTitle" placeholder="Worum geht es?"></div><label class="label">Thema</label><select id="communityTopic"><option>Programmieren</option><option>Mathematik</option><option>Englisch</option><option>Physik</option><option>Chemie</option><option>Lernen</option><option>Karriere</option><option>Allgemein</option></select><label class="label">Dein Beitrag</label><textarea id="communityContent" placeholder="Beschreibe deine Frage, Idee oder deinen Tipp möglichst konkret …"></textarea><button class="btn primary" id="communityPostBtn" style="margin-top:12px">Beitrag veröffentlichen</button><div id="communityMsg"></div></div>
   <div class="social-tabs"><button class="social-tab active" data-feed="for-you">🎯 Für dich</button><button class="social-tab" data-feed="following">👥 Folge ich</button><button class="social-tab" data-feed="trending">🔥 Trending</button></div><div><small class="community-meta">Menschen entdecken</small><div id="suggestedUsers" class="suggested-users"></div></div><div id="communityFeed"></div>
 </section>
 <section class="card" style="margin-top:20px" id="historyCard">
@@ -138,6 +142,10 @@ header{height:72px;background:#fff;border-bottom:1px solid var(--line);display:f
 </div>
 <script>
 let role='both',data={};const $=id=>document.getElementById(id);
+function showAuth(view='login'){ $('authArea').classList.remove('hidden'); $('dashboard').classList.add('hidden'); $('publicHome').classList.add('hidden'); if(view==='register'){show('account');bar(1);$('loginCard').classList.add('hidden');$('auth').classList.remove('hidden')}else{$('loginCard').classList.remove('hidden');$('auth').classList.add('hidden')} window.scrollTo({top:0,behavior:'smooth'});}
+function showPublicHome(){ $('authArea').classList.add('hidden'); $('dashboard').classList.add('hidden'); $('publicHome').classList.remove('hidden'); $('communityArea').classList.remove('hidden'); $('communityCompose').classList.add('hidden'); $('logout').classList.add('hidden'); $('navUser').textContent=''; }
+function openCommunity(){showPublicHome();loadCommunity('trending');}
+
 function bar(n){document.querySelectorAll('.steps span').forEach((x,i)=>x.classList.toggle('on',i<n))}
 function show(id){['account','profileForm','goalForm'].forEach(x=>$(x).classList.toggle('hidden',x!==id))}
 function setMessage(id,text,type){$(id).innerHTML=text?`<div class="message ${type||'info'}">${text}</div>`:''}async function api(path,body){const r=await fetch(path,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body||{})});const d=await r.json();if(!r.ok)throw new Error(d.error||'Fehler');return d}
@@ -182,7 +190,7 @@ async function openLearning(){
   }catch(e){$('tasks').innerHTML='<div class="message error">'+e.message+'</div>'}
 }
 $('learnBtn').onclick=openLearning;$('tutorBtn').onclick=()=>{$('tutorArea').classList.remove('hidden');$('learningArea').classList.add('hidden');$('curriculumArea').classList.add('hidden');$('tutorInput').focus()};
-async function loadMe(){try{const r=await fetch('/api/me');const d=await r.json();if(d.user){data=d.user;await dashboard()}}catch(e){console.error(e)}}
+async function loadMe(){try{const r=await fetch('/api/me');const d=await r.json();if(d.user){data=d.user;await dashboard();$('communityCompose').classList.remove('hidden');$('publicHome').classList.add('hidden');$('communityArea').classList.remove('hidden');loadCommunity();}else{showPublicHome();loadCommunity('trending')}}catch(e){showPublicHome();loadCommunity('trending')}}
 document.querySelectorAll('[data-role]').forEach(b=>b.onclick=()=>{role=b.dataset.role;document.querySelectorAll('[data-role]').forEach(x=>x.classList.toggle('sel',x===b))});
 $('accountNext').onclick=()=>{let e=$('email').value.trim(),p=$('password').value;if(!e.includes('@'))return $('email').focus();if(p.length<8)return $('password').focus();data.email=e;data.password=p;show('profileForm');bar(2)};
 $('backAccount').onclick=()=>{show('account');bar(1)};
@@ -190,6 +198,11 @@ $('profileNext').onclick=()=>{if(!$('name').value.trim())return $('name').focus(
 $('backProfile').onclick=()=>{show('profileForm');bar(2)};
 $('finish').onclick=async()=>{if(!$('goal').value.trim())return $('goal').focus();Object.assign(data,{name:$('name').value.trim(),role,country:$('country').value,language:$('preferredLanguage').value,age:$('age').value,about:$('about').value.trim(),goal:$('goal').value.trim(),category:$('category').value,level:$('level').value,skills:$('skills').value.trim()});$('finish').disabled=true;$('finish').textContent='Wird gespeichert …';try{await api('/api/register',data);await dashboard()}catch(e){alert(e.message)}finally{$('finish').disabled=false;$('finish').textContent='Konto & Profil speichern ✓'}};
 $('loginBtn').onclick=async()=>{try{await api('/api/login',{email:$('loginEmail').value.trim(),password:$('loginPassword').value});await dashboard()}catch(e){setMessage('loginMsg',e.message,'error')}};
+$('loginNav').onclick=()=>showAuth('login');
+$('registerNav').onclick=()=>showAuth('register');
+$('communityNav').onclick=openCommunity;
+$('communityPostBtn').onclick=async()=>{if(!data||!data.id){showAuth('register');$('communityMsg').innerHTML='<div class="message info">Erstelle kostenlos ein Konto, um selbst Beiträge zu veröffentlichen.</div>';return;}const title=$('communityTitle').value.trim(),content=$('communityContent').value.trim();try{const d=await api('/api/community/posts',{title,content,topic:$('communityTopic').value,post_type:$('communityType').value});$('communityTitle').value='';$('communityContent').value='';$('communityMsg').innerHTML='<div class="message success">✓ '+escapeHtml(d.message)+'</div>';const r=await fetch('/api/dashboard');if(r.ok)updateDashboardData(await r.json());await loadCommunity()}catch(e){$('communityMsg').innerHTML='<div class="message error">'+escapeHtml(e.message)+'</div>'}};
+
 $('logout').onclick=async()=>{await fetch('/api/logout',{method:'POST'});location.reload()};
 document.querySelectorAll('[data-xp]').forEach(btn=>btn.onclick=async()=>{btn.disabled=true;try{const d=await api('/api/xp',{action:btn.dataset.xp});data=d.user;updateDashboardData(d);$('xpMessage').textContent='✓ '+d.message+' · Du bist jetzt auf Platz #'+d.rank;$('xpMessage').className='message success'}catch(e){$('xpMessage').textContent=e.message;$('xpMessage').className='message error'}finally{btn.disabled=false}});
 function updateDashboardData(d){$('dashLevel').textContent=d.level;$('dashXpText').textContent=d.user.xp+' XP gesammelt';$('dashProgress').style.width=d.progress+'%';$('dashCurrent').textContent=d.user.xp+' XP';$('dashNext').textContent=(d.next_level_xp-d.user.xp)+' XP bis Level '+(d.level+1);$('dashRank').textContent='#'+d.rank;$('rankBig').textContent='#'+d.rank;$('dashTotal').textContent=d.total_users;$('dashXp').textContent=d.user.xp}
@@ -337,6 +350,7 @@ async function gpSelect(id){
   }catch(e){$('gpDetail').innerHTML='<div class="message error">'+gpEscape(e.message)+'</div>'}
 }
 $('goalPredictorNav').onclick=()=>{ $('authArea').classList.add('hidden');$('dashboard').classList.add('hidden');$('goalPredictorArea').classList.remove('hidden');gpLoad('live')};
+loadMe();
 $('goalPredictorBack').onclick=()=>location.reload();
 document.querySelectorAll('[data-gp-mode]').forEach(b=>b.onclick=()=>{document.querySelectorAll('[data-gp-mode]').forEach(x=>x.classList.toggle('active',x===b));gpLoad(b.dataset.gpMode)});
 setInterval(()=>{if(!$('goalPredictorArea').classList.contains('hidden'))gpLoad(gpState.mode)},600000); // maximal alle 10 Minuten; Server-Cache verhindert doppelte API-Aufrufe
